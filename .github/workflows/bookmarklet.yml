@@ -1,0 +1,52 @@
+name: Update bookmarklet
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - nurse-scheduler.js
+      - scripts/**
+      - README.md
+      - .github/workflows/bookmarklet.yml
+  workflow_dispatch:
+
+concurrency:
+  group: bookmarklet-main
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - run: node scripts/generate.mjs
+      - name: Commit README
+        run: |
+          if git diff --quiet -- README.md; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md
+          git commit -m 'Update generated bookmarklet'
+          git push origin HEAD:main
+      - uses: actions/upload-pages-artifact@v3
+        if: ${{ !github.event.repository.private }}
+        with:
+          path: _site
+
+  deploy:
+    if: ${{ !github.event.repository.private }}
+    needs: generate
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
